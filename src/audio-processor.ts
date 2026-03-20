@@ -229,6 +229,7 @@ export class AudioProcessor {
     correctionMode: CorrectionMode = "sync",
     private storage: SendspinStorage | null = null,
     useOutputLatencyCompensation: boolean = true,
+    private onFatalError?: () => void,
   ) {
     this._correctionMode = correctionMode;
     this.useOutputLatencyCompensation = useOutputLatencyCompensation;
@@ -1550,7 +1551,15 @@ export class AudioProcessor {
   // Initialize opus-encdec decoder (fallback when WebCodecs unavailable)
   private async initOpusEncdecDecoder(format: StreamFormat): Promise<void> {
     if (this.opusDecoderReady) {
-      await this.opusDecoderReady;
+      try {
+        await this.opusDecoderReady;
+      } catch (error) {
+        this.opusDecoder = null;
+        this.opusDecoderModule = null;
+        this.opusDecoderReady = null;
+        this.onFatalError?.();
+        throw error;
+      }
       return;
     }
 
@@ -1589,7 +1598,15 @@ export class AudioProcessor {
       console.log("[Opus] Decoder ready");
     })();
 
-    await this.opusDecoderReady;
+    try {
+      await this.opusDecoderReady;
+    } catch (error) {
+      this.opusDecoder = null;
+      this.opusDecoderModule = null;
+      this.opusDecoderReady = null;
+      this.onFatalError?.();
+      throw error;
+    }
   }
 
   // Handle native Opus decoder output - creates AudioBuffer and adds to queue
